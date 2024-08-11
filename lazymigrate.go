@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Delimiter is the default delimiter for the schema string.
@@ -55,13 +53,13 @@ func (s *Schema) Versions() []string {
 func (s *Schema) Migrate(ctx context.Context, db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {
-		return errors.Wrap(err, "cannot begin transaction")
+		return fmt.Errorf("cannot begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
 	var v int
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&v); err != nil {
-		return errors.Wrap(err, "cannot get PRAGMA user_version")
+		return fmt.Errorf("cannot get PRAGMA user_version: %w", err)
 	}
 
 	versions := s.Versions()
@@ -72,16 +70,16 @@ func (s *Schema) Migrate(ctx context.Context, db *sql.DB) error {
 	for i := v; i < len(versions); i++ {
 		_, err := tx.ExecContext(ctx, versions[i])
 		if err != nil {
-			return errors.Wrapf(err, "cannot apply migration %d (from 0th)", i)
+			return fmt.Errorf("cannot apply migration %d (from 0th): %w", i, err)
 		}
 	}
 
 	if _, err := tx.ExecContext(ctx, fmt.Sprintln("PRAGMA user_version =", len(versions))); err != nil {
-		return errors.Wrap(err, "cannot set PRAGMA user_version")
+		return fmt.Errorf("cannot set PRAGMA user_version: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "cannot commit new migrations")
+		return fmt.Errorf("cannot commit new migrations: %w", err)
 	}
 
 	return nil
